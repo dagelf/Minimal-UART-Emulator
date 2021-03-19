@@ -1,4 +1,4 @@
-# Minimal-UART-CPU Emulator (for Version 1.2)
+# Minimal-UART-CPU Emulator (for Board Revision 1.2)
 Emulate a Minimal UART CPU system in real-time in under 250 lines of C++ code.
 Infos on the corresponding hardware built (EEPROM version): https://github.com/slu4coder/Minimal-UART-Computer
 
