@@ -1,5 +1,6 @@
 // Minimal UART Emulator by Carsten Herting (2020/2021) Version 1.02
 // Compile with g++ main.cpp -Os -s
+// Tested with codeblocks 32 bit
 // Have fun!
 
 #include <iostream>											// console output
@@ -185,23 +186,23 @@ public:
 	void Reset()
 	{
 		for (auto& c : mComponents) c->Reset();
-		mInput = ""; mSimTime = 0.0f;
-		mLastTicks = GetTickCount();
+//		mInput = ""; mSimTime = 0.0f;
+//		mLastTicks = GetTickCount();
 	}
 	void Update()
 	{
-		uint32_t nowticks = GetTickCount();
-		mSimTime += (nowticks - mLastTicks)*0.001f;
-		mLastTicks = nowticks;		
-		while (mSimTime > 1.0f / 1843200.0f)
-		{
+//		uint32_t nowticks = GetTickCount();
+//		mSimTime += (nowticks - mLastTicks)*0.001f;
+//		mLastTicks = nowticks;		
+//		while (mSimTime > 1.0f / 1843200.0f)
+//		{
 			for(auto& c : mComponents) c->FallingEdge();
 			for(auto& c : mComponents) c->BeingLow();
 			for(auto& c : mComponents) c->RisingEdge();
 			for(auto& c : mComponents) c->GettingHigh();
 			for(auto& c : mComponents) c->BeingHigh();
-			mSimTime -= 1.0f / 1843200.0f;
-		}
+//			mSimTime -= 1.0f / 1843200.0f;
+//		}
 	}
 	void Input(char s) { mInput += s; }
 protected:
@@ -217,28 +218,27 @@ protected:
 int main()
 {
 	SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), 0b111);		// enable ANSI control sequences in WINDOWS console
+	fputs("\e[?25l", stdout);                                   // hide cursor
 	Computer cpu;
+	uint64_t ticks;
+	uint32_t time = GetTickCount();
+	
 	bool running = true;
 	while (running)
 	{
+		if (ticks++%10000==0)								// check keyboard every few ticks
 		while (kbhit())
 		{
 			static char lastch = 0;
 			char ch = getch();												// read-in of a character code
 			switch(lastch)
 			{
-				case -32:
-					switch(ch)
-					{
-						case 79: running = false; break;		// END
-						case 71: cpu.Reset(); break;				// POS1 = Reset
-						default: break;
-					}
-					break;
 				default:
-					switch(ch)														// expecting "single key"
+					switch(ch)													// expecting "single key"
 					{
 						case -32: break;										// move to special key mode
+						case '~': running = false; break;						
+						case '!': cpu.Reset(); break;							
 						case 13: cpu.Input('\n'); break;
 						default: cpu.Input(ch); break;
 					}
@@ -247,8 +247,10 @@ int main()
 			lastch = ch;
 		}		
 		cpu.Update();
-		Sleep(1);
+//		Sleep(1);
 	}
+	time = GetTickCount()-time;
+	std::cout << "\n" << ticks << " ticks in " << (time/1000) << "s, "  << (ticks/time/1000) << " ticks/s\n";
 	return 0;
 }
 
