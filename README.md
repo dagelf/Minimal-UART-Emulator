@@ -10,3 +10,9 @@ Cheers,
 Slu4
 
 Update: The instruction set is now compatible with the Minimal UART Computer (FLASH Edition).
+
+Added a keyboard input thread. Todo: add Linux support to mykeys.h
+
+Cheers, 
+dagelf
+
