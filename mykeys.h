@@ -2,9 +2,10 @@
 #include <thread>
 #include <atomic>
 
-#define kbuf 1000            // how many keys can you press in 10ms? (Or however long you think your main thread will take...
+#define kbuf 1000           // how many keys can you press in 10ms? (Or however long you think your main thread will take... 
 char key[kbuf],keyo=0;      // Keyboard repeat rate limits this... but input can be redirected, exceeding the repeat rate of just a single keyboard
 std::atomic<char> keyi;     // Convenient... but I can't help but wonder about the implementation & performance impact.
+                            // not that it's relevant here... but it could be on a battery sensitive IoT platform
 
 bool key_avail() {
     return keyo<keyi;
