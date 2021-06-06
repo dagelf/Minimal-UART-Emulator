@@ -1,16 +1,25 @@
 // Minimal UART Emulator by Carsten Herting (2020/2021) Version 1.02
 // Compile with g++ main.cpp -Os -s
-// Tested with codeblocks 32 bit
 // Have fun!
 
-#include <iostream>											// console output
-#include <windows.h>										// simple windows timing
-#include <conio.h>											// keyboard input, ancient and non-portable :-)
+#include <iostream>							// console output
+// using namespace std;
+
+#ifdef _WIN32
+    #include <Windows.h>
+#else
+    #include <unistd.h>
+#endif
+
 #include <memory>
 #include <vector>
 #include <fstream>
+#include <stdint.h>
 
-#define BO   		0b0000000000000001			// definition of control lines within control word
+#include "mykeys.h"
+
+
+#define BO   		0b0000000000000001	    // definition of control lines within control word
 #define BI  		0b0000000000000010
 #define AO   		0b0000000000000100
 #define AI   		0b0000000000001000
@@ -26,22 +35,23 @@
 #define CEME 		0b0010000000000000
 #define CO   		0b0100000000000000
 #define CI   		0b1000000000000000
-#define ACTLOW 	0b1101100101111111    	// 1: control signal is active low
+#define ACTLOW 	    0b1101100101111111    	// 1: control signal is active low
 
-class Component													// component interface class of the CPU
+
+class Component									// component interface class of the CPU
 {
 public:
 	virtual void Reset() {}								// virtual defines that this Function will be overwritten in derived classes
 	virtual void FallingEdge() {}
-	virtual void BeingLow() {}	
-	virtual void RisingEdge() {}	
+	virtual void BeingLow() {}
+	virtual void RisingEdge() {}
 	virtual void GettingHigh() {}
-	virtual void BeingHigh() {}	
+	virtual void BeingHigh() {}
 };
 
 class Register : public Component				// modeled after 74LS161 / 74HC161 (4-Bit Counter) bzw. 74HC173 (4-Bit Register Latch)
 {
-public:	
+public:
 	Register(uint8_t& port, uint16_t& ctrl, uint16_t inmask, uint16_t outmask, uint16_t countmask, uint16_t himask)
 	: mPortLines(port), mCtrlLines(ctrl), mInMask(inmask), mOutMask(outmask), mCountMask(countmask), mHiMask(himask) {}
 	void Reset() { mStore = 0; }
@@ -72,11 +82,11 @@ private:
 
 class Adder : public Component
 {
-public:	
+public:
 	Adder(uint8_t& port, uint16_t& ctrl, uint16_t outmask, uint16_t invmask, uint16_t cinmask, std::shared_ptr<Register> a, std::shared_ptr<Register> b, uint8_t& flags)
 	: mPortLines(port), mCtrlLines(ctrl), mOutMask(outmask), mInvMask(invmask), mCinMask(cinmask), mRegA(a), mRegB(b), mFlagLines(flags) {}
 	void BeingLow()
-	{	
+	{
 		int a, b;																													// A and B registers
 		a = int(mRegA->Get()) & 0xff;
 		if (mCtrlLines & mInvMask) b = int(~(mRegB->Get()) & 0xff);
@@ -90,7 +100,7 @@ public:
 	void GettingHigh() { BeingLow(); }			// 74HC283 works asynchroneous, use "EO|AI, EO|RI" instead of "EO|AI|RI" (same for BI)
 private:
 	uint8_t& mPortLines;										// reference to the IO lines the component is connected to
-	uint16_t& mCtrlLines;										// reference to the control word	
+	uint16_t& mCtrlLines;										// reference to the control word
 	uint16_t mOutMask, mInvMask, mCinMask;
 	std::shared_ptr<Register> mRegA, mRegB;
 	uint8_t& mFlagLines;										// connection to the flag lines (ALU outputs flags)
@@ -98,37 +108,39 @@ private:
 
 class Memory : public Component
 {
-public:	
+public:
 	Memory(uint8_t& port, uint16_t& ctrl, uint16_t inmask, uint16_t outmask, std::shared_ptr<Register> mar, std::string& inbuf)
 	: mPortLines(port), mCtrlLines(ctrl), mInMask(inmask), mOutMask(outmask), mMAR(mar), mInBuf(inbuf)
 	{
 		std::ifstream rom;
 		rom.open("ROM.bin", std::ios::binary | std::ios::in);
-		if (rom.is_open()) rom.read((char*)mStore, 0x2000);		
+		if (rom.is_open()) rom.read((char*)mStore, 0x2000);
 	}
 	void BeingLow()
-	{	
+	{
 		if (mCtrlLines & mOutMask)
 		{
-			if (mMAR->Get() & 0x8000)									// Terminal -> Port
+			if (mMAR->Get() & 0x8000)						// Terminal -> Port
 			{
 				if (mInBuf.size() > 0) { mPortLines = mInBuf[0]; mInBuf = mInBuf.substr(1); }
 				else mPortLines = 0;
 			}
-			else mPortLines = mStore[mMAR->Get()];		// RAM -> Port
+			else mPortLines = mStore[mMAR->Get()];		    // RAM -> Port
 		}
 	}
 	void BeingHigh()
 	{
 		if ((mCtrlLines & mInMask))
 		{
-			if((mMAR->Get() & 0x8000) == 0x8000 && mPortLines != 0) std::cout << mPortLines;	// 0x8000-0xffff: schreiben in UART
+			if((mMAR->Get() & 0x8000) == 0x8000 && mPortLines != 0) {
+                    std::cout << mPortLines << std::flush;                     // 0x8000-0xffff: schreiben in UART
+			}
 			else if (mMAR->Get() >= 0x2000) mStore[mMAR->Get()] = mPortLines;									// 0x2000-0x7fff: RAM, do not overwrite ROM 0x0000-0x1fff																																			// 0x0000-0x7fff: schreiben in RAM
-		}		
+		}
 	}
 private:
 	uint8_t& mPortLines;									// reference to the IO lines the component is connected to
-	uint16_t& mCtrlLines;									// reference to the control word	
+	uint16_t& mCtrlLines;									// reference to the control word
 	uint16_t mInMask, mOutMask;
 	std::shared_ptr<Register> mMAR;
 	uint8_t mStore[32768];
@@ -137,7 +149,7 @@ private:
 
 class Control : public Component
 {
-public:	
+public:
 	Control(uint8_t& port, uint16_t& ctrl, std::shared_ptr<Register> ireg, std::shared_ptr<Register> freg, std::shared_ptr<Register> sreg)
 	: mPortLines(port), mCtrlLines(ctrl), mRegInstr(ireg), mRegFlags(freg), mRegSteps(sreg)
 	{
@@ -154,10 +166,10 @@ public:
 			mCtrlLines = mMicrocode[((mRegFlags->Get() & 0b111)<<10) | ((mRegInstr->Get() & 0b111111)<<4) | (mRegSteps->Get() & 0b1111)];
 		}
 		if (mCtrlLines & HI) mPortLines = 0x7f; else mPortLines = 0xff;				// also set the state of the port (pull-up to +5V)
-	}	
+	}
 private:
 	uint8_t& mPortLines;									// reference to the IO lines the component is connected to
-	uint16_t& mCtrlLines;									// reference to the control word	
+	uint16_t& mCtrlLines;									// reference to the control word
 	std::shared_ptr<Register> mRegInstr, mRegFlags, mRegSteps;
 	uint16_t mMicrocode[8192];
 };
@@ -180,20 +192,21 @@ public:
 		mComponents.emplace_back(areg); mComponents.emplace_back(breg);
 		mComponents.emplace_back(ireg); mComponents.emplace_back(freg); mComponents.emplace_back(sreg);
 		mComponents.emplace_back(pc); mComponents.emplace_back(mar);
-		mComponents.emplace_back(ctrl); mComponents.emplace_back(alu); mComponents.emplace_back(ram);	
+		mComponents.emplace_back(ctrl); mComponents.emplace_back(alu); mComponents.emplace_back(ram);
 		Reset();
 	}
 	void Reset()
 	{
 		for (auto& c : mComponents) c->Reset();
-//		mInput = ""; mSimTime = 0.0f;
+		mInput = "";
+//		mSimTime = 0.0f;
 //		mLastTicks = GetTickCount();
 	}
 	void Update()
 	{
 //		uint32_t nowticks = GetTickCount();
 //		mSimTime += (nowticks - mLastTicks)*0.001f;
-//		mLastTicks = nowticks;		
+//		mLastTicks = nowticks;
 //		while (mSimTime > 1.0f / 1843200.0f)
 //		{
 			for(auto& c : mComponents) c->FallingEdge();
@@ -207,50 +220,41 @@ public:
 	void Input(char s) { mInput += s; }
 protected:
 	std::string mInput;
-	uint32_t mLastTicks;
-	float mSimTime;
+//	uint32_t mLastTicks;
+//	float mSimTime;
 	uint8_t mBusLines;
 	uint8_t mFlagLines;
 	uint16_t mCtrlLines;
 	std::vector<std::shared_ptr<Component>> mComponents;
 };
 
+
 int main()
 {
 	SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), 0b111);		// enable ANSI control sequences in WINDOWS console
 	fputs("\e[?25l", stdout);                                   // hide cursor
-	Computer cpu;
-	uint64_t ticks;
-	uint32_t time = GetTickCount();
 	
+	Computer cpu;
+    long tick;
+
 	bool running = true;
+
+    start_key_listen_thread();
+
 	while (running)
-	{
-		if (ticks++%10000==0)								// check keyboard every few ticks
-		while (kbhit())
-		{
-			static char lastch = 0;
-			char ch = getch();												// read-in of a character code
-			switch(lastch)
-			{
-				default:
-					switch(ch)													// expecting "single key"
-					{
-						case -32: break;										// move to special key mode
-						case '~': running = false; break;						
-						case '!': cpu.Reset(); break;							
-						case 13: cpu.Input('\n'); break;
-						default: cpu.Input(ch); break;
-					}
-					break;
-			}
-			lastch = ch;
-		}		
-		cpu.Update();
-//		Sleep(1);
+    {
+       while (key_avail()) {
+            char ch=key_pop();    //todo: compare how this compiles into various assemblers vs: char ch; key_pop(ch);
+//            cout << int(ch);
+            switch (ch) {
+					case '~': running = false; break;
+					case 27: cpu.Reset();  break;
+                    case 13: cpu.Input(10); break;
+                    default: cpu.Input(ch); break;
+            };
+		}
+		cpu.Update(); tick++; //Sleep(1);
 	}
-	time = GetTickCount()-time;
-	std::cout << "\n" << ticks << " ticks in " << (time/1000) << "s, "  << (ticks/time/1000) << " ticks/s\n";
 	return 0;
 }
 
