@@ -221,7 +221,7 @@ protected:
 
 int main()
 {
-	SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), 0b111);		// enable ANSI control sequences in WINDOWS console
+	SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), 0b111);                 // enable ANSI control sequences in WINDOWS console
 	Computer cpu;
 	bool running = true;
 	while (running)
@@ -229,21 +229,21 @@ int main()
 		while (kbhit())
 		{
 			static char lastch = 0;
-			char ch = getch();												// read-in of a character code
+			char ch = getch();	                                            // read-in of a character code
 			switch(lastch)
 			{
 				case -32:
 					switch(ch)
 					{
-						case 79: running = false; break;		// END
-						case 71: cpu.Reset(); break;				// POS1 = Reset
+						case 79: running = false; break;                    // END
+						case 71: cpu.Reset(); break;                        // POS1 = Reset
 						default: break;
 					}
 					break;
 				default:
-					switch(ch)														// expecting "single key"
+					switch(ch)                                              // expecting "single key"
 					{
-						case -32: break;										// move to special key mode
+						case -32: break;                                    // move to special key mode
 						case 13: cpu.Input('\n'); break;
 						default: cpu.Input(ch); break;
 					}
